@@ -22,6 +22,6 @@ func main() {
 	}
 
 	c := growatt.New(*username, *password, flag.Arg(0))
-	c.Login()
-	fmt.Printf("%+v", c)
+	l := c.PlantList()
+	fmt.Printf("%+v", l)
 }
