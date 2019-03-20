@@ -9,6 +9,8 @@ This exporter is logging into Growatt's server, fetches monitoring data and prin
 
 ## Simple API Documentation
 
+Check out [growatt.ipynb](./growatt.ipynb) if you are more familiar with python.
+
 ### Login
 Request curl
 ```text
