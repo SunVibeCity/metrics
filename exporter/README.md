@@ -147,3 +147,6 @@ Set-Cookie : [SERVERID=...;Path=/]
    }
 }
 ```
+
+### getInvTEnergy
+https://server.growatt.com/panel.do?plantId=123456&op=getInvTEnergy&date=2019-03-20

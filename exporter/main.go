@@ -4,12 +4,26 @@ import (
 	"./growatt"
 	"flag"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	dto "github.com/prometheus/client_model/go"
+	"net/http"
 	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+var (
+	totalEnergy = make(map[string]prometheus.Counter)
+	currentPower = make(map[string]prometheus.Gauge)
 )
 
 func main() {
 	username := flag.String("u", "", "Username")
 	password := flag.String("p", "", "Password")
+	addr     := flag.String("a", ":8080", "The address to listen on for HTTP requests.")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Example: %s -u john -p secret https://server.growatt.com/\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] [http[s]://]hostname[:port]/[path/]\nOptions are:\n", os.Args[0])
@@ -22,6 +36,71 @@ func main() {
 	}
 
 	c := growatt.New(*username, *password, flag.Arg(0))
-	l := c.PlantList()
-	fmt.Printf("%+v", l)
+	initMetrics(c.PlantList())
+	recordMetrics(*c)
+
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(*addr, nil)
+
+}
+
+func recordMetrics(c growatt.HttpClient) {
+	go func() {
+		for {
+			for _, p := range c.PlantList() {
+				tcv := readCounter(totalEnergy[p.PlantID])
+				tes := strings.Split(p.TotalEnergy, " ")
+				te, _ := strconv.ParseFloat(tes[0], 64)
+				if tes[1] == "kWh" {
+					te *= 1000
+				}
+				if tes[1] == "MWh" {
+					te *= 1000000
+				}
+				if tcv < te {
+					totalEnergy[p.PlantID].Add(te - tcv)
+				}
+				ces := strings.Split(p.CurrentPower, " ")
+				ce, _ := strconv.ParseFloat(ces[0], 64)
+				if ces[1] == "kW" {
+					ce *= 1000
+				}
+				if ces[1] == "MW" {
+					ce *= 1000000
+				}
+				currentPower[p.PlantID].Set(ce)
+
+			}
+			time.Sleep(10 * time.Second)
+		}
+	}()
+}
+
+func initMetrics(pl []growatt.Plant){
+	for _, p := range pl {
+		totalEnergy[p.PlantID] = promauto.NewCounter(prometheus.CounterOpts{
+			Name: "plant_total_energy",
+			Help: "Total energy produced in the given plant in Wh",
+			ConstLabels: map[string]string{
+				"plant_id": p.PlantID,
+				"plant_name": p.PlantName,
+				"is_have_storage": p.IsHaveStorage,
+			},
+		})
+		currentPower[p.PlantID] = promauto.NewGauge(prometheus.GaugeOpts{
+			Name: "plant_current_power",
+			Help: "Current energy produced in the given plant in W",
+			ConstLabels: map[string]string{
+				"plant_id": p.PlantID,
+				"plant_name": p.PlantName,
+				"is_have_storage": p.IsHaveStorage,
+			},
+		})
+	}
+}
+
+func readCounter(m prometheus.Counter) float64 {
+	pb := &dto.Metric{}
+	m.Write(pb)
+	return pb.GetCounter().GetValue()
 }

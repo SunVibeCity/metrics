@@ -11,7 +11,7 @@ import (
 	"net/url"
 )
 
-type httpClient struct {
+type HttpClient struct {
 	sess http.Client
 	url string
 	user User
@@ -61,12 +61,12 @@ const (
 	Total 	Timespan = 4
 )
 
-func New(username string, password string, url string) *httpClient {
+func New(username string, password string, url string) *HttpClient {
 	jar, _ := cookiejar.New(nil)
 	sess := http.Client{
 		Jar:jar,
 	}
-	return &httpClient{
+	return &HttpClient{
 		sess:sess,
 		url:url,
 		username:username,
@@ -90,7 +90,7 @@ func hashPassword(p string) string {
 	return fmt.Sprintf("%x", ohbs)
 }
 
-func (c *httpClient) Login() bool {
+func (c *HttpClient) Login() bool {
 	if (*c).user.Success != true {
 		resp, err := c.sess.PostForm(c.url + "LoginAPI.do", url.Values{"userName": {c.username}, "password": {c.token}})
 		if err != nil {
@@ -111,7 +111,7 @@ func (c *httpClient) Login() bool {
 	return (*c).user.Success == true
 }
 
-func (c *httpClient) Logout() bool {
+func (c *HttpClient) Logout() bool {
 	if (*c).user.Success == true {
 		resp, err := c.sess.Get(c.url + "logout.do")
 		if err != nil {
@@ -123,7 +123,7 @@ func (c *httpClient) Logout() bool {
 	return (*c).user.Success != true
 }
 
-func (c *httpClient) PlantList() []Plant {
+func (c *HttpClient) PlantList() []Plant {
 	if (*c).Login() != true {
 		panic("User can't log in.")
 	}
@@ -132,7 +132,6 @@ func (c *httpClient) PlantList() []Plant {
 		panic(err)
 	}
 	defer resp.Body.Close()
-
 	bs, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
@@ -145,13 +144,48 @@ func (c *httpClient) PlantList() []Plant {
 	return plr.Back.PlantList
 }
 
+func (c *HttpClient) FakePlantList() []Plant {
+	bs := `
+{
+   "back":{
+      "data":[
+         {
+            "plantMoneyText":"59.1 ",
+            "plantName":"Fancy Plant",
+            "plantId":"123456",
+            "isHaveStorage":"false",
+            "todayEnergy":"4.1 kWh",
+            "totalEnergy":"632.5 kWh",
+            "currentPower":"963.2 W"
+         }
+      ],
+      "totalData":{
+         "currentPowerSum":"963.2 W",
+         "CO2Sum":"632.5 T",
+         "isHaveStorage":"false",
+         "eTotalMoneyText":"59.1 ",
+         "todayEnergySum":"4.1 kWh",
+         "totalEnergySum":"632.5 kWh"
+      },
+      "success":true
+   }
+}
+`
+	plr := PlantListResponse{}
+	err := json.Unmarshal([]byte(bs), &plr)
+	if err != nil {
+		panic(err.Error())
+	}
+	return plr.Back.PlantList
+}
+
 // Return amount of power generated for the given timespan.
 // timeSpan=1, date=%Y-%m-%d (2019-03-20): power on each five minutes of the day.
 // timeSpan=2, date=%Y-%m : power on each day of the month.
 // timeSpan=3, date=%Y : power on each month of the year.
 // timeSpan=4, date= : power on each year. `date` parameter is ignored.
 
-func (c *httpClient) PlantDetail(plantId int64, timeSpan Timespan, date string) string {
+func (c *HttpClient) PlantDetail(plantId int64, timeSpan Timespan, date string) string {
 	if (*c).Login() != true {
 		panic("User can't log in.")
 	}
@@ -160,7 +194,6 @@ func (c *httpClient) PlantDetail(plantId int64, timeSpan Timespan, date string) 
 		panic(err)
 	}
 	defer resp.Body.Close()
-
 	bs, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		panic(err.Error())
