@@ -1,0 +1,15 @@
+version: '3'
+services:
+  exporter:
+    image: golang:1.8
+    volumes:
+      - ./exporter/src:/go/src/exporter
+    working_dir: /go/src/exporter
+    ports:
+      - "5000:5000"
+    dns: 8.8.8.8
+    command: go run main.go -u $GROWATT_USER -p $GROWATT_PASS https://server.growatt.com/
+    environment:
+      - GROWATT_USER=${GROWATT_USER}
+      - GROWATT_PASS=${GROWATT_PASS}
+    restart: always

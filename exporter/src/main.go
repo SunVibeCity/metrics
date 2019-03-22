@@ -8,7 +8,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	dto "github.com/prometheus/client_model/go"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -23,7 +25,7 @@ var (
 func main() {
 	username := flag.String("u", "", "Username")
 	password := flag.String("p", "", "Password")
-	addr     := flag.String("a", ":8080", "The address to listen on for HTTP requests.")
+	addr     := flag.String("a", ":5000", "The address to listen on for HTTP requests.")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Example: %s -u john -p secret https://server.growatt.com/\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] [http[s]://]hostname[:port]/[path/]\nOptions are:\n", os.Args[0])
@@ -34,6 +36,18 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+	u, err := url.ParseRequestURI(flag.Arg(0))
+	if err != nil {
+		panic(err)
+	}
+	hostAddr, err := net.LookupHost(u.Host)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Fprintf(os.Stdout, "Username: %s\nPassword: %s\n", *username, *password)
+	fmt.Fprintf(os.Stdout, "Growatt API: %s\nGrowatt Server Address: %s\n", flag.Arg(0), hostAddr)
+	fmt.Fprintf(os.Stdout, "\nRunning on %s ...\n", *addr)
 
 	c := growatt.New(*username, *password, flag.Arg(0))
 	initMetrics(c.PlantList())
@@ -41,7 +55,6 @@ func main() {
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(*addr, nil)
-
 }
 
 func recordMetrics(c growatt.HttpClient) {
@@ -71,7 +84,7 @@ func recordMetrics(c growatt.HttpClient) {
 				currentPower[p.PlantID].Set(ce)
 
 			}
-			time.Sleep(10 * time.Second)
+			time.Sleep(5 * time.Minute)
 		}
 	}()
 }
