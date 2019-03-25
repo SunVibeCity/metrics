@@ -84,7 +84,7 @@ func recordMetrics(c growatt.HttpClient) {
 				currentPower[p.PlantID].Set(ce)
 
 			}
-			time.Sleep(1 * time.Minute)
+			time.Sleep(5 * time.Minute)
 		}
 	}()
 }
